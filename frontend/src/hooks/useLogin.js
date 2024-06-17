@@ -1,45 +1,23 @@
-import { useState } from "react";
-import toast from "react-hot-toast";
-import { useAuthContext } from "../context/AuthContext";
+import { useEffect } from "react";
 
-const useLogin = () => {
-	const [loading, setLoading] = useState(false);
-	const { setAuthUser } = useAuthContext();
+import { useSocketContext } from "../context/SocketContext";
+import useConversation from "../zustand/useConversation";
 
-	const login = async (username, password) => {
-		const success = handleInputErrors(username, password);
-		if (!success) return;
-		setLoading(true);
-		try {
-			const res = await fetch("/api/auth/login", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ username, password }),
-			});
+import notificationSound from "../assets/sound/notification.mp3";
 
-			const data = await res.json();
-			if (data.error) {
-				throw new Error(data.error);
-			}
+const useListenMessages = () => {
+	const { socket } = useSocketContext();
+	const { messages, setMessages } = useConversation();
 
-			localStorage.setItem("chat-user", JSON.stringify(data));
-			setAuthUser(data);
-		} catch (error) {
-			toast.error(error.message);
-		} finally {
-			setLoading(false);
-		}
-	};
+	useEffect(() => {
+		socket?.on("newMessage", (newMessage) => {
+			newMessage.shouldShake = true;
+			const sound = new Audio(notificationSound);
+			sound.play();
+			setMessages([...messages, newMessage]);
+		});
 
-	return { loading, login };
+		return () => socket?.off("newMessage");
+	}, [socket, setMessages, messages]);
 };
-export default useLogin;
-
-function handleInputErrors(username, password) {
-	if (!username || !password) {
-		toast.error("Please fill in all fields");
-		return false;
-	}
-
-	return true;
-}
+export default useListenMessages;
